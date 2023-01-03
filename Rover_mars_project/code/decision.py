@@ -2,6 +2,37 @@
 import numpy as np
 from perception import check_rocks, to_polar_coords, pix_to_world
 
+
+# This is where you can build a decision tree for determining throttle, brake and steer
+# commands based on the output of the perception_step() function
+def decision_step(Rover):
+    # Implement conditionals to decide what to do given perception data
+    # Here you're all set up with some basic functionality but you'll need to
+    # improve on this decision tree to do a good job of navigating autonomously!
+
+    # Example:
+    # Check if we have vision data to make decisions with
+    if Rover.nav_angles is not None:
+        # print some info for debugging
+        print("Current mode: ", Rover.mode)
+        print("throttle_count:", Rover.throttle_count)
+
+        make_decision(Rover)
+
+    # Just to make the rover do something
+    # even if no modifications have been made to the code
+    else:
+        Rover.throttle = Rover.throttle_set[0]
+        Rover.steer = 0
+        Rover.brake = 0
+
+    # If in a state where want to pickup a rock send pickup command
+    if Rover.near_sample and Rover.vel == 0 and not Rover.picking_up:
+        Rover.send_pickup = True
+
+    return Rover
+
+
 def make_decision(Rover):
     # Check for Rover.mode status
     # Forward
@@ -220,3 +251,33 @@ def make_decision(Rover):
                     Rover.brake = 0
                     Rover.steer = 0
                     Rover.mode = 'forward'
+# Check if the rover is stuck
+def check_stuck(Rover, threshold):
+    # Throttle is on but the rover is not speeding up
+    if Rover.throttle >= 0.1 and Rover.vel < 0.2:  # stuck
+        if Rover.throttle_count > threshold:
+            Rover.throttle_count = 0
+            Rover.is_stuck = True
+            Rover.stuck_time = Rover.total_time
+            Rover.last_mode = Rover.mode  # save rover mode to get back to
+            Rover.mode = 'unstuck'
+        else:
+            Rover.throttle_count += Rover.throttle_set[1]
+    # Rover is running
+    elif Rover.vel >= 0.2:
+        Rover.is_stuck = False
+        Rover.throttle_count = 0
+    # For the strange situation when throttle cannot be set in forward mode
+    elif Rover.mode == 'forward' and Rover.vel < 0.2:
+        if Rover.forward_count > 1000:
+            Rover.forward_count = 0
+            Rover.is_stuck = True
+            Rover.stuck_time = Rover.total_time
+            Rover.last_mode = Rover.mode  # save rover mode to get back to
+            Rover.mode = 'unstuck'
+        else:
+            Rover.forward_count += 1
+
+
+                    
+                    
