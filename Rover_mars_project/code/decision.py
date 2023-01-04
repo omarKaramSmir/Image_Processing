@@ -251,6 +251,9 @@ def make_decision(Rover):
                     Rover.brake = 0
                     Rover.steer = 0
                     Rover.mode = 'forward'
+
+                    
+                    
 # Check if the rover is stuck
 def check_stuck(Rover, threshold):
     # Throttle is on but the rover is not speeding up
@@ -278,6 +281,87 @@ def check_stuck(Rover, threshold):
         else:
             Rover.forward_count += 1
 
+            
+# Check if the rover is making circle
+def check_circle(Rover):
+    if Rover.steer == 15 and Rover.vel > 0.5:
+        # circling
+        if Rover.circle_time > 50:
+            Rover.circle_time = 0
+            Rover.is_stuck = True
+            Rover.stuck_time = Rover.total_time
+            Rover.last_mode = Rover.mode  # save rover mode to get back to
+            Rover.mode = 'unstuck'
+        elif Rover.steer != 15:
+            Rover.circle_time = 0
+            Rover.is_stuck = False
+            Rover.stuck_time = 0
+        else:
+            Rover.circle_time += 0.2
+    elif Rover.steer == -15 and Rover.vel > 0.5:
+        # circling
+        if Rover.circle_time > 50:
+            Rover.circle_time = 0
+            Rover.is_stuck = True
+            Rover.stuck_time = Rover.total_time
+            Rover.last_mode = Rover.mode  # save rover mode to get back to
+            Rover.mode = 'unstuck'
+        elif Rover.steer != -15:
+            Rover.circle_time = 0
+            Rover.is_stuck = False
+            Rover.stuck_time = 0
+        else:
+            Rover.circle_time += 0.2
 
+
+# Maintain a certain speed
+def rover_maintain_speed(Rover, min, max):
+    if Rover.vel > max:
+        Rover.throttle = 0
+        Rover.brake = Rover.brake_soft
+    elif Rover.vel < min:
+        Rover.throttle = Rover.throttle_set[1]
+        Rover.brake = 0
+    else:
+        Rover.throttle = 0
+        Rover.brake = 0
+
+
+# Set throttle for rover
+def set_rover_throttle(Rover):
+    if len(Rover.nav_angles) >= Rover.go_forward * 3:
+        Rover.throttle += Rover.throttle_set[2]
+    elif len(Rover.nav_angles) >= Rover.go_forward * 2:
+        Rover.throttle += Rover.throttle_set[1]
+    elif len(Rover.nav_angles) > Rover.go_forward:
+        Rover.throttle += Rover.throttle_set[0]
+    else:
+        Rover.throttle = 0
+
+
+# Get next steer
+def get_navi_steer(Rover):
+    if Rover.is_going_home:
+        # get home pos
+        home = Rover.home
+        # get current rover pos
+        pos = Rover.pos
+        # convert them into world coords
+        home_world_x, home_world_y = pix_to_world(home[0], home[1], pos[0], pos[1], Rover.yaw, Rover.worldmap.shape[0],
+                                                  10)
+        home_world_dist, home_world_angle = to_polar_coords(home_world_x, home_world_y)
+
+        mean_angle = np.mean(Rover.nav_angles)
+
+        # Steer toward home
+        if mean_angle > home_world_angle:
+            steer = -10
+        else:
+            steer = +10
+    else:
+        # Set steering to average angle clipped to the range +/- 15
+        steer = np.mean(Rover.nav_angles * 180 / np.pi) + 10  # lean towards left side wall
+
+    return np.clip(steer, -15, 15)
                     
                     
